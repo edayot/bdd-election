@@ -2,6 +2,7 @@ import folium
 import json
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 def style_function(feature):
     # Random color
@@ -42,6 +43,10 @@ for i,feature in enumerate(json_data["features"][:]):
     ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
     ax.set_title(name)
     # Save the file with random name
+    try:
+        os.mkdir("graph")
+    except:
+        pass
     plt.savefig(f"graph/pie_{i}.png")
     plt.close(fig)
 
