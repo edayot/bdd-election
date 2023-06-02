@@ -34,7 +34,7 @@ def average_color(hex_colors, sizes):
 def style_function(feature):
     return {
         'fillOpacity': 0.5,
-        'weight': 0,
+        'weight': 0.2,
         'fillColor': feature["properties"]["color"]
     }
 def highlight_function(feature):
@@ -87,7 +87,7 @@ GROUP BY Candidats.Id_Parti, Bulletin.Id_election, Bulletin.Id_bureaux, CNI.Nom,
 
 
 
-    m = folium.Map(location=[48.8, 3.0], zoom_start=5)
+    m = folium.Map(location=[48, 3.0], zoom_start=15)
     for row in rows:
         global a
         a=row[2]
@@ -294,11 +294,11 @@ WHERE Parti_Politique.ID_Parti = ?
     # Ajout des résultats nationaux
 
     query="""
-SELECT DISTINCTROW CNI.Nom, CNI.Prenom, Elections.Id, Elections.date_premier_tour, Type_Elections.Type, Count(*) AS [Compte De Bulletin]
-FROM Type_Elections INNER JOIN (Elections INNER JOIN (CNI INNER JOIN (Candidats INNER JOIN (Bulletin INNER JOIN Liste_Candidats ON (Bulletin.Id_vote = Liste_Candidats.Id_Candidats) AND (Bulletin.Id_election = Liste_Candidats.Id_Elections)) ON Candidats.Id_Candidats = Liste_Candidats.Id_Candidats) ON CNI.NuméroCNI = Candidats.Id_CNI) ON Elections.Id = Liste_Candidats.Id_Elections) ON Type_Elections.Id = Elections.type_elections
+SELECT DISTINCTROW CNI.Nom, CNI.Prenom, Elections.Id, Elections.date_premier_tour, Type_Elections.Type, Count(*) AS [Compte De Bulletin], Parti_Politique.ID_Parti
+FROM Parti_Politique INNER JOIN (Type_Elections INNER JOIN (Elections INNER JOIN (CNI INNER JOIN (Candidats INNER JOIN (Bulletin INNER JOIN Liste_Candidats ON (Bulletin.Id_election = Liste_Candidats.Id_Elections) AND (Bulletin.Id_vote = Liste_Candidats.Id_Candidats)) ON Candidats.Id_Candidats = Liste_Candidats.Id_Candidats) ON CNI.NuméroCNI = Candidats.Id_CNI) ON Elections.Id = Liste_Candidats.Id_Elections) ON Type_Elections.Id = Elections.type_elections) ON Parti_Politique.ID_Parti = Candidats.Id_Parti
 WHERE Bulletin.Id_election = ?
-GROUP BY CNI.Nom, CNI.Prenom, Elections.Id, Elections.date_premier_tour, Type_Elections.Type, Bulletin.Id_vote, Bulletin.Id_election;
-    """
+GROUP BY CNI.Nom, CNI.Prenom, Elections.Id, Elections.date_premier_tour, Type_Elections.Type, Bulletin.Id_vote, Bulletin.Id_election, Parti_Politique.ID_Parti;
+   """
     cursor.execute(query,id_election)
 
     results=cursor.fetchall()
@@ -307,9 +307,22 @@ GROUP BY CNI.Nom, CNI.Prenom, Elections.Id, Elections.date_premier_tour, Type_El
 
     sizes = [r[5] for r in results]
     labels = [f"{r[1]} {r[0]}" for r in results]
+
+    colors=[]
+    for r in results:
+        cursor = conn.cursor()
+        # Select the color of the party in "Parti Politique" table
+        queryy=f"""
+        SELECT Parti_Politique.Couleur FROM Parti_Politique
+WHERE Parti_Politique.ID_Parti = ?  
+        """
+
+        cursor.execute(queryy,r[6])
+        colors.append("#"+cursor.fetchall()[0][0])
+
     
     fig, ax = plt.subplots()
-    ax.pie(sizes, labels=labels, autopct='%1.1f%%', shadow=True, startangle=90)
+    ax.pie(sizes, labels=labels, autopct='%1.1f%%', shadow=True, startangle=90,colors=colors)
     ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
     ax.set_title("Résultats nationaux")
     
