@@ -44,7 +44,7 @@ def highlight_function(feature):
         'fillColor': 'white'
     }
 
-def display_departement(id):
+def display_departement(id,id_election):
     path = "C:\\Users\\erwan\\Documents\\Dev\\bdd-election\\_Elections.accdb"
     conn = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=' + path + ';')
 
@@ -53,10 +53,12 @@ def display_departement(id):
     query="""
 SELECT Count(*) AS NombreVotes, Candidats.Id_Parti, Bulletin.Id_election, Bulletin.Id_bureaux, CNI.Nom, CNI.Prenom, Type_Elections.Type, Elections.date_premier_tour
 FROM Type_Elections INNER JOIN (Elections INNER JOIN (CNI INNER JOIN (Candidats INNER JOIN (Bulletin INNER JOIN Liste_Candidats ON (Bulletin.Id_election = Liste_Candidats.Id_Elections) AND (Bulletin.Id_vote = Liste_Candidats.Id_Candidats)) ON Candidats.Id_Candidats = Liste_Candidats.Id_Candidats) ON CNI.NuméroCNI = Candidats.Id_CNI) ON Elections.Id = Liste_Candidats.Id_Elections) ON Type_Elections.Id = Elections.type_elections
+WHERE Bulletin.Id_election = ?
 GROUP BY Candidats.Id_Parti, Bulletin.Id_election, Bulletin.Id_bureaux, CNI.Nom, CNI.Prenom, Type_Elections.Type, Elections.date_premier_tour, Bulletin.Id_vote;
 
+
     """
-    cursor.execute(query)
+    cursor.execute(query,id_election)
     results=cursor.fetchall()
     print(results)
 
@@ -116,7 +118,7 @@ WHERE Parti_Politique.ID_Parti = ?
 
         # Select the color with the most votes
         max_color = "#FFFFFF"
-        max_color = average_color(colors, np.exp(np.array(sizes)))
+        max_color = average_color(colors, (np.array(sizes))**2)
 
         print(max_color, row[1])
         
@@ -129,6 +131,131 @@ WHERE Parti_Politique.ID_Parti = ?
             }
         }
         circ=folium.GeoJson(feature,highlight_function=highlight_function,style_function=style_function)
+        name=f"{dpt_name} {row[1]}"
+        circ.add_child(folium.Tooltip(name))
+
+
+        #print(colors)
+            
+
+        
+        # Create the pie chart
+        fig, ax = plt.subplots()
+        ax.pie(sizes, labels=labels, autopct='%1.1f%%', shadow=True, startangle=90,colors=colors)
+        ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+        ax.set_title(name)
+        #
+
+
+        # Save the file with random name
+        try:
+            os.mkdir("graph")
+        except:
+            pass
+        plt.savefig(f"graph/pie_{row[1]}.png")
+        plt.close(fig)
+
+
+
+        # Add the pie chart to the map
+        graph_html = '<img src="{}">'.format(f"graph/pie_{row[1]}.png")
+        popup = folium.Popup(graph_html, max_width=2650)
+        popup.add_to(circ)
+        circ.add_to(m)
+    m.save('map.html')
+    conn.close()
+
+
+def display_all(id_election):
+    path = "C:\\Users\\erwan\\Documents\\Dev\\bdd-election\\_Elections.accdb"
+    conn = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=' + path + ';')
+
+    cursor = conn.cursor()
+
+    query="""
+SELECT Count(*) AS NombreVotes, Candidats.Id_Parti, Bulletin.Id_election, Bulletin.Id_bureaux, CNI.Nom, CNI.Prenom, Type_Elections.Type, Elections.date_premier_tour
+FROM Type_Elections INNER JOIN (Elections INNER JOIN (CNI INNER JOIN (Candidats INNER JOIN (Bulletin INNER JOIN Liste_Candidats ON (Bulletin.Id_election = Liste_Candidats.Id_Elections) AND (Bulletin.Id_vote = Liste_Candidats.Id_Candidats)) ON Candidats.Id_Candidats = Liste_Candidats.Id_Candidats) ON CNI.NuméroCNI = Candidats.Id_CNI) ON Elections.Id = Liste_Candidats.Id_Elections) ON Type_Elections.Id = Elections.type_elections
+WHERE Bulletin.Id_election = ?
+GROUP BY Candidats.Id_Parti, Bulletin.Id_election, Bulletin.Id_bureaux, CNI.Nom, CNI.Prenom, Type_Elections.Type, Elections.date_premier_tour, Bulletin.Id_vote;
+
+
+    """
+    cursor.execute(query,id_election)
+    results=cursor.fetchall()
+    print(results)
+
+    
+
+    cursor = conn.cursor()
+    query=f"""
+    SELECT Toxicode.type, Toxicode.ID, Toxicode.geometry FROM Toxicode
+    """
+    cursor.execute(query)
+    rows = cursor.fetchall()
+
+    
+
+
+
+    m = folium.Map(location=[48.8, 3.0], zoom_start=5)
+    for row in rows[:20]:
+        global a
+        a=row[2]
+        
+        
+        
+        # Create a pie chart
+        # using the result list find all maching results
+        result = [x for x in results if x[3]==row[1]]
+        
+        # take the r[0] for the number of votes and r[5] + r[4] for the name of the candidate
+        labels = [f"{r[5]} {r[4]}" for r in result]
+
+        colors=[]
+        for r in result:
+            cursor = conn.cursor()
+            # Select the color of the party in "Parti Politique" table
+            queryy=f"""
+            SELECT Parti_Politique.Couleur FROM Parti_Politique
+WHERE Parti_Politique.ID_Parti = ?
+            """
+
+            cursor.execute(queryy,r[1])
+            colors.append("#"+cursor.fetchall()[0][0])
+
+        # take the r[0] for the number of votes
+        sizes = [r[0] for r in result]
+
+        # Select the color with the most votes
+        max_color = "#FFFFFF"
+        max_color = average_color(colors, (np.array(sizes))**2)
+
+        print(max_color, row[1])
+        
+        feature={
+            "type":row[0],
+            "geometry":ast.literal_eval(row[2]),
+            "properties":{
+                "ID":row[1],
+                "color":max_color
+            }
+        }
+        circ=folium.GeoJson(feature,highlight_function=highlight_function,style_function=style_function)
+
+        cursor = conn.cursor()
+        query=f"""
+        SELECT Departement.nom_departement FROM Departement
+        WHERE Departement.code_departement = ? 
+        """
+        id=row[1]
+        if id[0]=="0":
+            cursor.execute(query,id[1:])
+        else:
+            cursor.execute(query,id[:])
+
+        dpt_name=cursor.fetchall()[0][0]
+        print(dpt_name)
+
         name=f"{dpt_name} {row[1]}"
         circ.add_child(folium.Tooltip(name))
 
