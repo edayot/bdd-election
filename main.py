@@ -169,7 +169,7 @@ WHERE Parti_Politique.ID_Parti = ?
 def display_all(id_election):
     path = "C:\\Users\\erwan\\Documents\\Dev\\bdd-election\\_Elections.accdb"
     conn = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=' + path + ';')
-
+    
     cursor = conn.cursor()
 
     query="""
@@ -182,13 +182,12 @@ GROUP BY Candidats.Id_Parti, Bulletin.Id_election, Bulletin.Id_bureaux, CNI.Nom,
     """
     cursor.execute(query,id_election)
     results=cursor.fetchall()
-    print(results)
 
     
 
     cursor = conn.cursor()
     query=f"""
-    SELECT Toxicode.type, Toxicode.ID, Toxicode.geometry FROM Toxicode
+    SELECT Toxicode.type, Toxicode.ID, Toxicode.geometry, Toxicode.code_dpt FROM Toxicode
     """
     cursor.execute(query)
     rows = cursor.fetchall()
@@ -198,7 +197,7 @@ GROUP BY Candidats.Id_Parti, Bulletin.Id_election, Bulletin.Id_bureaux, CNI.Nom,
 
 
     m = folium.Map(location=[48.8, 3.0], zoom_start=5)
-    for row in rows[:20]:
+    for row in rows:
         global a
         a=row[2]
         
@@ -228,9 +227,9 @@ WHERE Parti_Politique.ID_Parti = ?
 
         # Select the color with the most votes
         max_color = "#FFFFFF"
-        max_color = average_color(colors, (np.array(sizes))**2)
+        max_color = average_color(colors, np.exp((np.array(sizes))))
 
-        print(max_color, row[1])
+        #print(max_color, row[1])
         
         feature={
             "type":row[0],
@@ -247,14 +246,16 @@ WHERE Parti_Politique.ID_Parti = ?
         SELECT Departement.nom_departement FROM Departement
         WHERE Departement.code_departement = ? 
         """
-        id=row[1]
+        id=row[3]
         if id[0]=="0":
             cursor.execute(query,id[1:])
         else:
             cursor.execute(query,id[:])
-
-        dpt_name=cursor.fetchall()[0][0]
-        print(dpt_name)
+        #print(id)
+        try:
+            dpt_name=cursor.fetchall()[0][0]
+        except:
+            dpt_name="Non trouvé"
 
         name=f"{dpt_name} {row[1]}"
         circ.add_child(folium.Tooltip(name))
@@ -288,15 +289,49 @@ WHERE Parti_Politique.ID_Parti = ?
         popup.add_to(circ)
         circ.add_to(m)
     m.save('map.html')
+    
+
+    # Ajout des résultats nationaux
+
+    query="""
+SELECT DISTINCTROW CNI.Nom, CNI.Prenom, Elections.Id, Elections.date_premier_tour, Type_Elections.Type, Count(*) AS [Compte De Bulletin]
+FROM Type_Elections INNER JOIN (Elections INNER JOIN (CNI INNER JOIN (Candidats INNER JOIN (Bulletin INNER JOIN Liste_Candidats ON (Bulletin.Id_vote = Liste_Candidats.Id_Candidats) AND (Bulletin.Id_election = Liste_Candidats.Id_Elections)) ON Candidats.Id_Candidats = Liste_Candidats.Id_Candidats) ON CNI.NuméroCNI = Candidats.Id_CNI) ON Elections.Id = Liste_Candidats.Id_Elections) ON Type_Elections.Id = Elections.type_elections
+WHERE Bulletin.Id_election = ?
+GROUP BY CNI.Nom, CNI.Prenom, Elections.Id, Elections.date_premier_tour, Type_Elections.Type, Bulletin.Id_vote, Bulletin.Id_election;
+    """
+    cursor.execute(query,id_election)
+
+    results=cursor.fetchall()
+    # Create a pie chart
+    # using the result list find all maching results
+
+    sizes = [r[5] for r in results]
+    labels = [f"{r[1]} {r[0]}" for r in results]
+    
+    fig, ax = plt.subplots()
+    ax.pie(sizes, labels=labels, autopct='%1.1f%%', shadow=True, startangle=90)
+    ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+    ax.set_title("Résultats nationaux")
+    
+    plt.savefig(f"graph/pie_national.png")
+    
+      
+
     conn.close()
 
+
+
+
+
+
+
+
+
+
+
+
+
     
-        
-
-
-
-
-
 """
 
 m = folium.Map(location=[48.8, 3.0], zoom_start=5)

@@ -62,7 +62,7 @@ for bureau in bureaux:
         print(k, "bureaux traités sur", len(bureaux))
         k_prev=k_str
 
-    for id_bulletin in range(1000*k,1000*k+1000):
+    for id_bulletin in range(100*k,100*k+100):
         choix = random.choices([7,8,1,2], weights=[bureau["proba_sarkozy"],bureau["proba_hollande"],bureau["proba_blanc"],bureau["proba_nul"]])[0]
         cursor.execute(query1, (id_bulletin, choix, 17, bureau["id"]))
 
