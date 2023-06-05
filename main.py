@@ -7,6 +7,8 @@ import pyodbc
 import ast
 import numpy as np
 
+path = "C:\\Users\\erwan\\Documents\\Dev\\bdd-election\\_Elections.accdb"
+
 def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
@@ -45,7 +47,7 @@ def highlight_function(feature):
     }
 
 def display_departement(id,id_election):
-    path = "C:\\Users\\erwan\\Documents\\Dev\\bdd-election\\_Elections.accdb"
+    
     conn = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=' + path + ';')
 
     cursor = conn.cursor()
@@ -167,7 +169,7 @@ WHERE Parti_Politique.ID_Parti = ?
 
 
 def display_all(id_election):
-    path = "C:\\Users\\erwan\\Documents\\Dev\\bdd-election\\_Elections.accdb"
+    
     conn = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=' + path + ';')
     
     cursor = conn.cursor()
